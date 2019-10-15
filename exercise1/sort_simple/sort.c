@@ -26,11 +26,11 @@ int main(int argc, char ** argv)
 	char *strings[MAX_STRINGS];
 
 	int len, linecount;
-	char *sp, linebuf[MAX_LENGTH];
+	char *sp, linebuf[MAX_LENGTH+1];
 
 	// Read in the strings from stdin, accounting for case of no newline at the end
 	linecount = 0;
-	while ((len = getline(linebuf, MAX_LENGTH)) > 0) {
+	while ((len = getline(linebuf, MAX_LENGTH+1)) > 0) {
 		if (linebuf[len-1] == '\n') {
 			// If the line has a newline at the end, replace it with null byte
 			linebuf[len-1] = '\0';
