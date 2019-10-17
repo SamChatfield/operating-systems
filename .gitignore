@@ -56,3 +56,6 @@ exercise1/sort_*/sort
 
 # MacOS System Files
 .DS_Store
+
+# VSCode Settings
+.vscode
