@@ -16,8 +16,20 @@ void destroy(list *l)
 
 int get(list *l, unsigned int index)
 {
-    printf("Get\n");
-    return 0;
+    // List is empty
+    if (!(l->head) && !(l->last)) return -1;
+
+    // Traverse the list until we get to the correct index
+    listnode *n = l->head;
+    unsigned int i = index;
+    while (n) {
+        if (i == 0) return n->data;
+        n = n->next;
+        i--;
+    }
+
+    // Something went wrong, return error
+    return -1;
 }
 
 int prepend(list *l, int data)
@@ -62,8 +74,31 @@ int append(list *l, int data)
 
 int insert(list *l, unsigned int index, int data)
 {
-    printf("Insert\n");
-    return 0;
+    // List is empty
+    if (!(l->head) && !(l->last)) return -1;
+
+    // Allocate memory for the new list node
+    listnode *n = (listnode *) malloc(sizeof(listnode));
+    if (!n) return -1;
+
+    listnode *p = l->head;
+    unsigned int i = index;
+
+    // Traverse the list until the correct index is reached
+    while (p) {
+        if (i == 0) {
+            // Insert the new node in between the current and next nodes
+            n->next = p->next;
+            n->data = data;
+            p->next = n;
+            return 0;
+        }
+        p = p->next;
+        i--;
+    }
+
+    // Something went wrong, return error
+    return -1;
 }
 
 int remove_element(list *l, unsigned int index)
@@ -74,7 +109,7 @@ int remove_element(list *l, unsigned int index)
 
 void print_list(list *l)
 {
-    if ((l->head) == NULL && (l->last) == NULL) {
+    if (!(l->head) && !(l->last)) {
         // Empty list
         printf("empty list\n");
     } else {
