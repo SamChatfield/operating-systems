@@ -4,14 +4,23 @@
 
 void init(list *l)
 {
-    *l = *(list *) malloc(sizeof(list));
     l->head = NULL;
     l->last = NULL;
 }
 
 void destroy(list *l)
 {
-    printf("Destroy\n");
+    listnode *n = l->head;
+    listnode *m;
+
+    // Traverse the list and free each listnode in turn
+    while (n) {
+        m = n;
+        n = n->next;
+        free(m);
+    }
+
+    l = NULL;
 }
 
 int get(list *l, unsigned int index)
@@ -19,13 +28,13 @@ int get(list *l, unsigned int index)
     // List is empty
     if (!(l->head) && !(l->last)) return -1;
 
-    // Traverse the list until we get to the correct index
     listnode *n = l->head;
-    unsigned int i = index;
+
+    // Traverse the list until we get to the correct index
     while (n) {
-        if (i == 0) return n->data;
+        if (index == 0) return n->data;
         n = n->next;
-        i--;
+        index--;
     }
 
     // Something went wrong, return error
@@ -40,10 +49,12 @@ int prepend(list *l, int data)
     n->data = data;
 
     if (!(l->head) && !(l->last)) {
+        // If the list is empty, set node to both the head and the last of the list
         l->head = n;
         l->last = n;
         n->next = NULL;
     } else {
+        // Otherwise, replace the head of the list with the new node
         n->next = l->head;
         l->head = n;
     }
@@ -77,24 +88,24 @@ int insert(list *l, unsigned int index, int data)
     // List is empty
     if (!(l->head) && !(l->last)) return -1;
 
-    // Allocate memory for the new list node
-    listnode *n = (listnode *) malloc(sizeof(listnode));
-    if (!n) return -1;
-
     listnode *p = l->head;
-    unsigned int i = index;
 
-    // Traverse the list until the correct index is reached
+    // Traverse the list until correct index is reached
     while (p) {
-        if (i == 0) {
+        if (index == 0) {
+            // Allocate memory for the new list node
+            listnode *n = (listnode *) malloc(sizeof(listnode));
+            if (!n) return -1;
+
             // Insert the new node in between the current and next nodes
             n->next = p->next;
             n->data = data;
             p->next = n;
+
             return 0;
         }
         p = p->next;
-        i--;
+        index--;
     }
 
     // Something went wrong, return error
@@ -103,8 +114,31 @@ int insert(list *l, unsigned int index, int data)
 
 int remove_element(list *l, unsigned int index)
 {
-    printf("Remove\n");
-    return 0;
+    // List is empty
+    if (!(l->head) && !(l->last)) return -1;
+
+    listnode *n = l->head;
+    unsigned int i = index;
+    unsigned int j = 0;
+    listnode *last = NULL;
+
+    // Traverse the list until the correct index is reached
+    while (n) {
+        if (i == 0) {
+            if (last) last->next = n->next;
+            if (j == 0) l->head = n->next;
+            if (j == index) l->last = last;
+            free(n);
+            return 0;
+        }
+        last = n;
+        n = n->next;
+        i--;
+        j++;
+    }
+
+    // Something went wrong, return error
+    return -1;
 }
 
 void print_list(list *l)

@@ -1,4 +1,5 @@
 #include "linkedlist.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -14,26 +15,21 @@ int main(int argc, char** argv){
   list l;
   debug_print("init\n");
   init(&l);
-  print_list(&l); //empty list
 
   //testcase
   debug_print("prepend\n");
   prepend(&l, 1);
   print_list(&l); //1
 
-  printf("get [0]: %d\n", get(&l, 0));
+  printf("get: %d\n", get(&l, 0));
 
   debug_print("append\n");
   append(&l, 3);
   print_list(&l); //1 3
 
-  printf("get [1]: %d\n", get(&l, 1));
-
   debug_print("insert\n");
   insert(&l, 0, 2);
   print_list(&l); //1 2 3
-
-  printf("get [1]: %d\n", get(&l, 1));
 
   debug_print("insert\n");
   insert(&l, 2, 4);
@@ -42,6 +38,7 @@ int main(int argc, char** argv){
   debug_print("remove\n");
   remove_element(&l, 2);
   print_list(&l); //1 2 4
+
   debug_print("remove\n");
   remove_element(&l, 0);
   print_list(&l); //2 4
