@@ -53,6 +53,7 @@ dkms.conf
 
 # Operating Systems Binaries
 exercise1/sort_*/sort
+exercise1/linked_list/test_list
 
 # MacOS System Files
 .DS_Store

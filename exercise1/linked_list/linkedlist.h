@@ -4,13 +4,13 @@
 // --- Data structures ---
 
 typedef struct listnode {
-    listnode *next;
+    struct listnode *next;
     int data;
 } listnode;
 
 typedef struct list {
-    listnode *first;
-    listnode *last;
+    struct listnode *head;
+    struct listnode *last;
 } list;
 
 // --- Functions ---
