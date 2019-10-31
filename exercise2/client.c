@@ -8,13 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 
-// Displays error messages from system calls */
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
-}
-
 int main(int argc, char *argv[])
 {
     struct addrinfo hints;
@@ -22,7 +15,7 @@ int main(int argc, char *argv[])
     int sockfd, s;
 
     if (argc != 3) {
-        fprintf(stderr, "usage %s <hostname> <port>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <hostname> <port>\n", argv[0]);
         exit(1);
     }
 
@@ -36,7 +29,7 @@ int main(int argc, char *argv[])
     s = getaddrinfo(argv[1], argv[2], &hints, &result);
     if (s != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 
     // getaddrinfo() returns a list of address structures
@@ -49,7 +42,6 @@ int main(int argc, char *argv[])
             continue;
 
         if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
-            // Success
             break;
 
         close(sockfd);
@@ -58,12 +50,37 @@ int main(int argc, char *argv[])
     // No address succeeded
     if (rp == NULL) {
         fprintf(stderr, "Could not connect\n");
-        exit(EXIT_FAILURE);
+        exit(1);
     }
 
     freeaddrinfo(result);
 
-    // DO CLIENT STUFF
+    char *linebuffer = NULL;
+    size_t len = 0;
+    ssize_t nread;
+    int n;
+
+    // Use getline to read an arbitrary length string from stdin
+    // This gives the text followed by a newline followed by a null byte
+    while ((nread = getline(&linebuffer, &len, stdin)) != -1) {
+        printf("line (%d): %s\n", nread, linebuffer);
+
+        for (uint i = 0; i < nread+1; i++) {
+            printf("line[%d]: %02x (%c)\n", i, linebuffer[i], linebuffer[i]);
+        }
+
+        n = write(sockfd, linebuffer, nread+1);
+        if (n < 0) {
+            fprintf(stderr, "Could not write line '%s' to socket\n", linebuffer);
+            free(linebuffer);
+            close(sockfd);
+            exit(1);
+        }
+        printf("Wrote line\n");
+    }
+
+    free(linebuffer);
+    close(sockfd);
 
     return 0;
 }

@@ -21,7 +21,7 @@ case $(jobs -rp) in
     *)
 	kill -PIPE $(jobs -rp);;
 esac
-	
+
 
 #check output
 diff /tmp/logfile.txt test_outSingle.txt
