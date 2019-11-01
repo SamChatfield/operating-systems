@@ -32,25 +32,23 @@ void *processRequest(void *args)
     char buffer[BUFSIZ];
     int n, c;
 
-    logfp = fopen(logfilepath, "a");
-    if (!logfp) {
-        fprintf(stderr, "Error: Failed to open log file\n");
-    }
-
     while ((n = read(*newsockfd, buffer, BUFSIZ))) {
         printf("Got (%d) (%d) '%s'\n", n, strlen(buffer), buffer);
         c = 0;
-
-        // for (int i = 0; i < n+1; i++) {
-        //     printf("buf[%d] = '%c'\n", i, buffer[i]);
-        // }
 
         while (c < n) {
             // Acquire lock
             pthread_mutex_lock(&mut);
 
-            fprintf(logfp, "%d %s", logline, &(buffer[c]));
-            logline++;
+            logfp = fopen(logfilepath, "a");
+            if (!logfp) {
+                fprintf(stderr, "Error: Failed to open log file\n");
+            } else {
+                fprintf(logfp, "%d %s", logline, &(buffer[c]));
+                logline++;
+
+                fclose(logfp);
+            }
 
             // Release lock
             pthread_mutex_unlock(&mut);
@@ -60,11 +58,9 @@ void *processRequest(void *args)
     }
 
     // Important to avoid memory leak
-    fclose(logfp);
     close(*newsockfd);
     free(newsockfd);
 
-    printf("N = %d\n", n);
     printf("Cleaned up thread\n");
 
     pthread_exit(NULL);
@@ -119,9 +115,9 @@ int main(int argc, char *argv[])
             if (fgetc(logfp) == '\n')
                 logline++;
         }
+        fclose(logfp);
     }
     printf("Lines already in log: %d\n", logline);
-    fclose(logfp);
 
     // Now wait in an endless loop for connections and process them
     while (1) {
