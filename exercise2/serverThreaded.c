@@ -108,9 +108,8 @@ int main(int argc, char *argv[])
 
     // Get the number of lines already in the log file
     FILE *logfp = fopen(logfilepath, "r");
-    if (!logfp) {
-        logline = 0;
-    } else {
+    logline = 0;
+    if (logfp) {
         while (!feof(logfp)) {
             if (fgetc(logfp) == '\n')
                 logline++;
