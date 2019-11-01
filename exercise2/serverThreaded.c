@@ -32,21 +32,28 @@ void *processRequest(void *args)
     char buffer[BUFSIZ];
     int n, c;
 
+    // Read from the socket into a buffer
     while ((n = read(*newsockfd, buffer, BUFSIZ))) {
         printf("Got (%d) (%d) '%s'\n", n, strlen(buffer), buffer);
         c = 0;
 
+        // Loop over the buffer to treat each line separately in case multiple lines in buffer at once
         while (c < n) {
             // Acquire lock
             pthread_mutex_lock(&mut);
 
+            // Open/close log file in critical section because lines are only appended after file is closed
+            // Otherwise we could get the correct line numbers but the lines out-of-order within the file
             logfp = fopen(logfilepath, "a");
             if (!logfp) {
+                // Couldn't open the log file, do not exit as per specification
                 fprintf(stderr, "Error: Failed to open log file\n");
             } else {
+                // Write the line found at specified position in buffer to the log file
                 fprintf(logfp, "%d %s", logline, &(buffer[c]));
+                // Increment the shared line counter
                 logline++;
-
+                // Close the log file to complete the appending of lines into the file in correct order
                 fclose(logfp);
             }
 
