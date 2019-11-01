@@ -63,12 +63,6 @@ int main(int argc, char *argv[])
     // Use getline to read an arbitrary length string from stdin
     // This gives the text followed by a newline followed by a null byte
     while ((nread = getline(&linebuffer, &len, stdin)) != -1) {
-        printf("line (%d): %s\n", nread, linebuffer);
-
-        for (uint i = 0; i < nread+1; i++) {
-            printf("line[%d]: %02x (%c)\n", i, linebuffer[i], linebuffer[i]);
-        }
-
         n = write(sockfd, linebuffer, nread+1);
         if (n < 0) {
             fprintf(stderr, "Could not write line '%s' to socket\n", linebuffer);
@@ -76,7 +70,6 @@ int main(int argc, char *argv[])
             close(sockfd);
             exit(1);
         }
-        printf("Wrote line\n");
     }
 
     free(linebuffer);
