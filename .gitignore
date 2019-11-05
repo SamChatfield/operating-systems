@@ -59,6 +59,8 @@ exercise2/client
 exercise2/serverSingle
 exercise2/serverThreaded
 
+exercise3/ioctl
+
 # MacOS System Files
 .DS_Store
 
