@@ -26,3 +26,12 @@ Do not modify or add files in the repository that start with `test`, since we us
 
 ## Submission
 You should put all your files into a directory named exercise3 in your project on the School's git server. The The directory exercise3 must be at the top level of your project for the marking scripts to work. We will run the command make in the directory exercise3 in order to obtain all required binaries. Do not use any files or directory with the prefix "test", since we will use such files for running tests. Submission consists of pushing your solution to your project as specified above; the last submission before the submission deadline has ended counts as your submission. It is worth trying out submission well before the deadline even if the solution is not correct yet.
+
+For marking we will use additional, more advanced, test scripts which check whether your program satisfies the specification. If the provided test scripts fail, all the more advanced test scripts are likely to fail as well. Any code which does not compile on the virtual machine provided will be awarded 0 marks and not be reviewed.
+
+## Useful Links
+
+* [Introduction to writing linux kernel modules, part 1](http://derekmolloy.ie/writing-a-linux-kernel-module-part-1-introduction)
+* [Introduction to writing linux kernel modules, part 2](http://derekmolloy.ie/writing-a-linux-kernel-module-part-2-a-character-device)
+* [Linux kernel API](https://www.kernel.org/doc/htmldocs/kernel-api)
+* [Browsing linux kernel source](https://elixir.bootlin.com/linux/v4.4.93/source)
