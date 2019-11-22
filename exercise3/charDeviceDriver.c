@@ -89,7 +89,6 @@ void cleanup_module(void)
 static int device_open(struct inode *inode, struct file *file)
 {
     mutex_lock(&devLock);
-	printk(KERN_DEBUG "device_open\n");
     if (Device_Open) {
 		mutex_unlock(&devLock);
 		return -EBUSY;
@@ -106,7 +105,6 @@ static int device_open(struct inode *inode, struct file *file)
 static int device_release(struct inode *inode, struct file *file)
 {
     mutex_lock(&devLock);
-	printk(KERN_DEBUG "device_release\n");
 	Device_Open--;		/* We're now ready for our next caller */
 	mutex_unlock(&devLock);
 	/*
@@ -134,19 +132,13 @@ static ssize_t device_read(struct file *filp,	/* see include/linux/fs.h   */
 	char *mp;
 	size_t msize;
 
-	printk(KERN_DEBUG "device_read\n");
-
 	n = mqueue_pop(Message_Queue);
-	if (n == NULL) {
-		printk(KERN_DEBUG "!n\n");
-		return -EAGAIN;
-	}
+	if (n == NULL) return -EAGAIN;
+
 	message_open = n->message;
 	msize = n->msize;
 	mp = message_open;
 	printk(KERN_DEBUG "popped (%zu) '%.*s'\n", msize, msize, message_open);
-
-	printk(KERN_DEBUG "pop done\n");
 
 	while (length && bytes_read < msize) {
 		result = put_user(*(mp++), buffer++);
@@ -156,8 +148,6 @@ static ssize_t device_read(struct file *filp,	/* see include/linux/fs.h   */
 		length--;
 		bytes_read++;
 	}
-
-	printk(KERN_DEBUG "popped (%d) '%.*s'\n", bytes_read, bytes_read, message_open);
 
 	kfree(message_open);
 	message_open = NULL;
@@ -181,13 +171,9 @@ device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 	unsigned int i;
 	int result;
 
-	printk(KERN_DEBUG "device_write\n");
-	printk(KERN_DEBUG "len: %zu\n", len);
-	printk(KERN_DEBUG "buff: '%.*s'\n", len, buff);
-
 	if (len > MAX_MESSAGE_SIZE) {
 		// Message too large, return invalid argument error
-		printk(KERN_INFO "Provided message exceeded max message size\n");
+		printk(KERN_ALERT "Provided message exceeded max message size\n");
 		return -EINVAL;
 	}
 
@@ -201,7 +187,7 @@ device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 		// printk(KERN_DEBUG "Char (%d): '%c'\n", i, buff[i]);
 		message[i] = buff[i];
 	}
-	printk(KERN_INFO "Got (%zu) '%.*s'\n", len, len, message);
+	printk(KERN_DEBUG "Got (%zu) '%.*s'\n", len, len, message);
 
 	result = mqueue_push(Message_Queue, message, len);
 	if (result != 0) {
@@ -217,7 +203,6 @@ device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
 // Initialise new queue
 void mqueue_init(mqueue *q)
 {
-	printk(KERN_DEBUG "mqueue_init\n");
 	q->front = NULL;
 	q->back = NULL;
 	q->tsize = 0;
@@ -229,11 +214,8 @@ int mqueue_push(mqueue *q, char *m, size_t msize)
 	mqueue_node *n;
 	size_t tsize_new;
 
-	printk(KERN_DEBUG "mqueue_push\n");
-	printk(KERN_DEBUG "m: '%.*s'", msize, m);
-
 	tsize_new = q->tsize + msize;
-	printk(KERN_DEBUG "tsize_new = %zu\n", tsize_new);
+
 	if (tsize_new > max_total_size) {
 		printk(KERN_ALERT "Cannot add message, total size of all messages would be exceeded\n");
 		return -EAGAIN;
@@ -265,8 +247,6 @@ int mqueue_push(mqueue *q, char *m, size_t msize)
 mqueue_node *mqueue_pop(mqueue *q)
 {
 	mqueue_node *n;
-
-	printk(KERN_DEBUG "mqueue_pop\n");
 
 	// Queue is empty
 	if (!(q->front) && !(q->back)) {
