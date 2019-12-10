@@ -14,9 +14,9 @@
 
 int init_module(void);
 void cleanup_module(void);
+void cleanup_portlist(void);
 unsigned int FirewallExtensionHook(void *, struct sk_buff *, const struct nf_hook_state *);
-char *find_executable(void);
-// char *find_executable(char *);
+struct program *find_executable(void);
 int procfs_open(struct inode *, struct file *);
 int procfs_close(struct inode *, struct file *);
 ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count, loff_t *offset);
@@ -31,6 +31,11 @@ typedef struct fw_port_list {
     uint16_t port;
     struct fw_prog_list *prog_list;
 } fw_port_list;
+
+struct program {
+    char *buffer;
+    char *name;
+};
 
 static struct nf_hook_ops firewallExtension_ops = {
     .hook = FirewallExtensionHook,

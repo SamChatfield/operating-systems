@@ -66,13 +66,41 @@ void cleanup_module(void)
     // Restore everything to normal
     nf_unregister_hook(&firewallExtension_ops);
 
-    kfree(Port_List);
-    Port_List = NULL;
+    // Free all memory associated with the Port_List
+    cleanup_portlist();
 
     remove_proc_entry(PROC_ENTRY_FILENAME, NULL);
     printk(KERN_INFO "/proc/%s removed\n", PROC_ENTRY_FILENAME);
 
     printk(KERN_INFO "Firewall extensions module unloaded\n");
+}
+
+void cleanup_portlist(void)
+{
+    fw_port_list *port_list, *tmp_port_list;
+    fw_prog_list *prog_list, *tmp_prog_list;
+
+    printk(KERN_DEBUG "Cleaning up Port_List\n");
+
+    port_list = Port_List;
+
+    while (port_list) {
+        prog_list = port_list->prog_list;
+
+        while (prog_list) {
+            printk(KERN_DEBUG "Freeing '%s'\n", prog_list->program);
+            tmp_prog_list = prog_list;
+            prog_list = prog_list->next;
+            // TODO: Free tmp_prog_list->program if that becomes heap allocated
+            kfree(tmp_prog_list);
+        }
+
+        tmp_port_list = port_list;
+        port_list = port_list->next;
+        kfree(tmp_port_list);
+    }
+
+    Port_List = NULL;
 }
 
 unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
@@ -119,12 +147,6 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
         }
         mmput(mm);
 
-        // if (ntohs(tcp->dest) == 80) {
-        //     tcp_done(sk); /* terminate connection immediately */
-        //     printk(KERN_INFO "Connection shut down\n");
-        //     return NF_DROP;
-        // }
-
         // Determine port
         // If port is in firewall_ports_list
             // Determine program
@@ -140,30 +162,32 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
         while (port_list) {
             if (port_list->port == dst_port) {
                 // Determine program
-                char *program;
+                // char *program;
+                struct program *prog;
                 size_t prog_len;
                 fw_prog_list *prog_list;
 
-                program = find_executable();
+                prog = find_executable();
                 // program = find_executable(program);
-                prog_len = strlen(program);
+                prog_len = strlen(prog->name);
 
                 prog_list = port_list->prog_list;
 
                 while (prog_list) {
-                    if (strncmp(program, prog_list->program, prog_len) == 0) {
+                    if (strncmp(prog->name, prog_list->program, prog_len) == 0) {
                         // Program found in program list for current port, accept packet
-                        printk(KERN_INFO "Program '%s' found in list for port '%u', accepting\n", program, (unsigned int) dst_port);
-                        kfree(program);
+                        printk(KERN_INFO "Program '%s' found in list for port '%u', accepting\n", prog->name, (unsigned int) dst_port);
+                        kfree(prog->buffer);
+                        kfree(prog);
                         return NF_ACCEPT;
                     }
                     prog_list = prog_list->next;
                 }
 
-                // TODO: WEIRD CRASH CAUSED HERE SOMEWHERE?
                 // Program not found in program list, so drop packet
-                printk(KERN_INFO "Program '%s' not found in list for port '%u', dropping\n", program, (unsigned int) dst_port);
-                kfree(program);
+                printk(KERN_INFO "Program '%s' not found in list for port '%u', dropping\n", prog->name, (unsigned int) dst_port);
+                kfree(prog->buffer);
+                kfree(prog);
                 tcp_done(sk);
                 return NF_DROP;
             }
@@ -175,18 +199,19 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
     return NF_ACCEPT;
 }
 
-// char *find_executable(char *program)
-char *find_executable()
+struct program *find_executable()
 {
     struct path path;
     pid_t mod_pid;
-    char *program;
+    struct program *prog;
+    char *prog_buf;
+    char *prog_name;
 
     char cmdlineFile[EXE_BUFSIZ];
     int res;
 
     printk(KERN_INFO "findExecutable\n");
-    /* current is pre-defined pointer to task structure of currently running task */
+    // Current is pre-defined pointer to task structure of currently running task
     mod_pid = current->pid;
     snprintf(cmdlineFile, EXE_BUFSIZ, "/proc/%d/exe", mod_pid);
     res = kern_path(cmdlineFile, LOOKUP_FOLLOW, &path);
@@ -195,24 +220,29 @@ char *find_executable()
         return NULL;
     }
 
-    program = (char *) kmalloc(EXE_BUFSIZ * sizeof(char), GFP_KERNEL);
-    if (!program) {
-        printk(KERN_ALERT "Failed to allocate space for program path\n");
+    prog = (struct program *) kmalloc(sizeof(struct program), GFP_KERNEL);
+    if (!prog) {
+        printk(KERN_ALERT "Failed to allocate space for program struct\n");
+        return NULL;
+    }
+    prog_buf = (char *) kmalloc(EXE_BUFSIZ * sizeof(char), GFP_KERNEL);
+    if (!prog_buf) {
+        printk(KERN_ALERT "Failed to allocate space for program buffer\n");
+        kfree(prog);
         return NULL;
     }
 
-    program = d_path(&path, program, EXE_BUFSIZ);
-    printk(KERN_INFO "Program is %s\n", program);
-    printk(KERN_INFO "Program len is %d", strlen(program));
-    // printk(KERN_INFO "The name is %s\n", procDentry->d_name.name);
-    // printk(KERN_INFO "The name of the parent is %s\n", procDentry->d_parent->d_name.name);
-    // printk(KERN_INFO "The name of the parent x2 is %s\n", procDentry->d_parent->d_parent->d_name.name);
-    // printk(KERN_INFO "The name of the parent x3 is %s\n", procDentry->d_parent->d_parent->d_parent->d_name.name);
-    // printk(KERN_INFO "The name of the parent x4 is %s\n", procDentry->d_parent->d_parent->d_parent->d_parent->d_name.name);
+    prog_name = d_path(&path, prog_buf, EXE_BUFSIZ);
+    printk(KERN_INFO "Program name is %s\n", prog_name);
+    printk(KERN_INFO "Program len is %d", strlen(prog_name));
+    printk(KERN_INFO "program_buf pointer: %p, program pointer: %p\n", (void *) prog_buf, (void *) prog_name);
 
     path_put(&path);
 
-    return program;
+    prog->buffer = prog_buf;
+    prog->name = prog_name;
+
+    return prog;
 }
 
 int procfs_open(struct inode *inode, struct file *file)
