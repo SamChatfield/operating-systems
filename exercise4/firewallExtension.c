@@ -15,8 +15,6 @@
 #include <asm/uaccess.h>
 #include "firewallExtension.h"
 
-MODULE_AUTHOR("Sam Chatfield <sxc678@student.bham.ac.uk>");
-MODULE_DESCRIPTION("Extensions to the firewall") ;
 MODULE_LICENSE("GPL");
 
 int init_module(void)
@@ -248,19 +246,40 @@ struct program *find_executable()
 int procfs_open(struct inode *inode, struct file *file)
 {
     printk(KERN_DEBUG "procfs_open\n");
+
+    mutex_lock(&proc_lock);
+    if (Device_Open) {
+		mutex_unlock(&proc_lock);
+		return -EAGAIN;
+    }
+    Device_Open++;
+    mutex_unlock(&proc_lock);
+
 	try_module_get(THIS_MODULE);
+
 	return 0;
 }
 
 int procfs_close(struct inode *inode, struct file *file)
 {
     printk(KERN_DEBUG "procfs_close\n");
+
+    mutex_lock(&proc_lock);
+	Device_Open--;
+	mutex_unlock(&proc_lock);
+
     module_put(THIS_MODULE);
     return 0;
+}
+
+ssize_t procfs_read(struct file *file, char __user *buffer, size_t count, loff_t *offset)
+{
+    printk(KERN_DEBUG "procfs_read\n");
+    return -1;
 }
 
 ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count, loff_t *offset)
 {
     printk(KERN_DEBUG "procfs_write\n");
-    return 0;
+    return -1;
 }

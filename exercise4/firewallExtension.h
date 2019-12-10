@@ -19,7 +19,8 @@ unsigned int FirewallExtensionHook(void *, struct sk_buff *, const struct nf_hoo
 struct program *find_executable(void);
 int procfs_open(struct inode *, struct file *);
 int procfs_close(struct inode *, struct file *);
-ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count, loff_t *offset);
+ssize_t procfs_read(struct file *, char *, size_t, loff_t *);
+ssize_t procfs_write(struct file *, const char *, size_t, loff_t *);
 
 typedef struct fw_prog_list {
     struct fw_prog_list *next;
@@ -44,11 +45,14 @@ static struct nf_hook_ops firewallExtension_ops = {
     .hooknum = NF_INET_LOCAL_OUT
 };
 
+DEFINE_MUTEX(proc_lock);
+static int Device_Open = 0;
 static fw_port_list *Port_List = NULL;
 static struct proc_dir_entry *Proc_File = NULL;
 static struct file_operations Proc_File_Fops = {
     .owner   = THIS_MODULE,
     .open 	 = procfs_open,
     .release = procfs_close,
+    .read    = procfs_read,
     .write 	 = procfs_write,
 };
