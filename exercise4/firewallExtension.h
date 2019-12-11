@@ -11,9 +11,13 @@
 
 #define PROC_ENTRY_FILENAME "firewallExtension"
 #define EXE_BUFSIZ 80
+#define NEW_RULES_FLAG "NEW"
+#define END_RULES_FLAG "END"
+#define RULES_FLAG_LEN 3
 
 int init_module(void);
 void cleanup_module(void);
+int init_portlist(void);
 void cleanup_portlist(void);
 unsigned int FirewallExtensionHook(void *, struct sk_buff *, const struct nf_hook_state *);
 struct program *find_executable(void);
@@ -48,6 +52,7 @@ static struct nf_hook_ops firewallExtension_ops = {
 DEFINE_MUTEX(proc_lock);
 static int Device_Open = 0;
 static fw_port_list *Port_List = NULL;
+// static fw_port_list *Port_List_Tmp = NULL;
 static struct proc_dir_entry *Proc_File = NULL;
 static struct file_operations Proc_File_Fops = {
     .owner   = THIS_MODULE,
