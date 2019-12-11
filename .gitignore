@@ -61,6 +61,8 @@ exercise2/serverThreaded
 
 exercise3/ioctl
 
+exercise4/Setup/firewallSetup
+
 # MacOS System Files
 .DS_Store
 
