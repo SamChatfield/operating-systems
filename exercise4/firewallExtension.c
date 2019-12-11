@@ -39,8 +39,8 @@ int init_module(void)
     printk(KERN_INFO "Firewall extension module loaded\n");
 
     // Initialise the Port_List
-    errno = init_portlist();
-    if (errno) return errno;
+    Port_List = init_portlist();
+    if (!Port_List) return -ENOMEM;
 
     // TODO: REMOVE
     pl = (fw_prog_list *) kmalloc(sizeof(fw_prog_list), GFP_KERNEL);
@@ -66,7 +66,9 @@ void cleanup_module(void)
     nf_unregister_hook(&firewallExtension_ops);
 
     // Free all memory associated with the Port_List
-    cleanup_portlist();
+    cleanup_portlist(Port_List);
+    if (Port_List_Tmp)
+        cleanup_portlist(Port_List_Tmp);
 
     remove_proc_entry(PROC_ENTRY_FILENAME, NULL);
     printk(KERN_INFO "/proc/%s removed\n", PROC_ENTRY_FILENAME);
@@ -78,26 +80,31 @@ void cleanup_module(void)
  * Values of next and prog_list pointers initialised to NULL
  * Port number initialised to 0 to signify an empty fw_port_list node
  */
-int init_portlist(void)
+fw_port_list *init_portlist(void)
 {
-    Port_List = (fw_port_list *) kmalloc(sizeof(fw_port_list), GFP_KERNEL);
-    if (!Port_List)
-        return -ENOMEM;
-    Port_List->next = NULL;
-    Port_List->port = 0;
-    Port_List->prog_list = NULL;
-    return 0;
+    fw_port_list *port_list;
+
+    printk(KERN_DEBUG "Initialising port list\n");
+
+    port_list = (fw_port_list *) kmalloc(sizeof(fw_port_list), GFP_KERNEL);
+    if (!port_list)
+        return NULL;
+    port_list->next = NULL;
+    port_list->port = 0;
+    port_list->prog_list = NULL;
+
+    return port_list;
 }
 
 /* Free all memory assoicated with Port_List and NULL the pointer */
-void cleanup_portlist(void)
+void cleanup_portlist(fw_port_list *port_list_head)
 {
     fw_port_list *port_list, *tmp_port_list;
     fw_prog_list *prog_list, *tmp_prog_list;
 
-    printk(KERN_DEBUG "Cleaning up Port_List\n");
+    printk(KERN_DEBUG "Cleaning up port list\n");
 
-    port_list = Port_List;
+    port_list = port_list_head;
 
     while (port_list) {
         printk(KERN_DEBUG "Freeing port node: '%u'\n", (unsigned int) port_list->port);
@@ -116,8 +123,6 @@ void cleanup_portlist(void)
         port_list = port_list->next;
         kfree(tmp_port_list);
     }
-
-    Port_List = NULL;
 }
 
 unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
@@ -312,27 +317,36 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     size_t port_len, prog_len;
     char *program;
     uint16_t port;
-    // fw_port_list *port_list;
-    // fw_prog_list *prog_list;
+    fw_port_list *port_list, *new_port_list;
+    fw_prog_list *new_prog_list;
 
     printk(KERN_DEBUG "procfs_write\n");
-    printk(KERN_DEBUG "count=%zu\n", count);
 
-    // If buffer is NEW_RULES flag: cleanup and reinitialise Port_List
+    // If buffer is NEW flag: initialise temporary new Port_List_Tmp
     if (count >= RULES_FLAG_LEN && strncmp(buffer, NEW_RULES_FLAG, RULES_FLAG_LEN) == 0) {
         printk(KERN_DEBUG "Buffer started with NEW flag\n");
+
+        Port_List_Tmp = init_portlist();
+        if (!Port_List_Tmp) {
+            printk(KERN_DEBUG "init_portlist failed\n");
+            return -ENOMEM;
+        }
+
         return count;
-    } else if (count >= RULES_FLAG_LEN && strncmp(buffer, END_RULES_FLAG, RULES_FLAG_LEN) == 0) {
+    }
+    // If buffer is END flag: swap in Port_List_Tmp to Port_List
+    else if (count >= RULES_FLAG_LEN && strncmp(buffer, END_RULES_FLAG, RULES_FLAG_LEN) == 0) {
         printk(KERN_DEBUG "Buffer started with END flag\n");
+
+        // Cleanup old port list
+        cleanup_portlist(Port_List);
+        // Swap in the new port list from Port_List_Tmp to Port_List
+        Port_List = Port_List_Tmp;
+        Port_List_Tmp = NULL;
+
         return count;
     } else {
-        printk(KERN_DEBUG "Buffer was not a flag but count was 10\n");
-    }
-    cleanup_portlist();
-    errno = init_portlist();
-    if (errno) {
-        printk(KERN_DEBUG "init_portlist failed\n");
-        return errno;
+        printk(KERN_DEBUG "Buffer was not a flag\n");
     }
 
     // TODO: REMOVE
@@ -346,6 +360,8 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     kbuffer = (char *) kmalloc(sizeof(char) * count, GFP_KERNEL);
     if (!kbuffer) {
         printk(KERN_ALERT "Failed to allocate kernel buffer\n");
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
 		return -ENOMEM;
     }
 
@@ -353,6 +369,9 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     errno = copy_from_user(kbuffer, buffer, count);
     if (errno) {
         printk(KERN_ALERT "Failed to copy_from_user\n");
+        kfree(kbuffer);
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
         return errno;
     }
     kbuffer[count-1] = '\0';
@@ -387,6 +406,9 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     program = (char *) kmalloc(sizeof(char) * prog_len, GFP_KERNEL);
     if (!program) {
         printk(KERN_ALERT "Failed to allocate program string\n");
+        kfree(kbuffer);
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
         return -ENOMEM;
     }
     for (i = 0; i < prog_len; i++) {
@@ -403,22 +425,68 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
 	}
     // TODO: END REMOVE
 
-    // Walk through Port_List and add the new rule
+    // Walk through Port_List_Tmp and add the new rule
 
-    // port_list = Port_List;
+    port_list = Port_List_Tmp;
 
-    // while (port_list) {
-    //     if (port_list->port == 0) {
-    //         // Empty port_list
-    //     } else if (port_list->port == port) {
-    //         // Correct port found already existing
-    //         // Loop through prog_list
-    //     }
-    // }
-    // Got to end of port_list and not found
+    while (port_list) {
+        if (port_list->port == 0 || port_list->port == port) {
+            new_prog_list = (fw_prog_list *) kmalloc(sizeof(fw_prog_list), GFP_KERNEL);
+            if (!new_prog_list) {
+                printk(KERN_ALERT "Failed to allocate space for new program list element\n");
+                kfree(program);
+                kfree(kbuffer);
+                cleanup_portlist(Port_List_Tmp);
+                Port_List_Tmp = NULL;
+                return -ENOMEM;
+            }
+            new_prog_list->next = port_list->prog_list;
+            new_prog_list->program = program;
 
-    kfree(program);
-    kfree(kbuffer);
+            // If this is the first entry into the port list, initialise the other values
+            if (port_list->port == 0) {
+                printk(KERN_DEBUG "Empty port_list, init next and port values\n");
+                port_list->next = NULL;
+                port_list->port = port;
+            }
+            // Point port's prog_list to the new element
+            port_list->prog_list = new_prog_list;
 
-    return count;
+            printk(KERN_DEBUG "Added program to front of port %u prog_list\n", (unsigned int) port_list->port);
+            goto OUT;
+        }
+        port_list = port_list->next;
+    }
+    // Got to end of port_list and not found, add new entry to port list
+    new_prog_list = (fw_prog_list *) kmalloc(sizeof(fw_prog_list), GFP_KERNEL);
+    if (!new_prog_list) {
+        printk(KERN_ALERT "Failed to allocate space for new program list element\n");
+        kfree(program);
+        kfree(kbuffer);
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
+        return -ENOMEM;
+    }
+    new_prog_list->next = NULL;
+    new_prog_list->program = program;
+
+    new_port_list = (fw_port_list *) kmalloc(sizeof(fw_port_list), GFP_KERNEL);
+    if (!new_port_list) {
+        printk(KERN_ALERT "Failed to allocate space for new port list element\n");
+        kfree(new_prog_list);
+        kfree(program);
+        kfree(kbuffer);
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
+        return -ENOMEM;
+    }
+    new_port_list->next = Port_List_Tmp;
+    new_port_list->port = port;
+    new_port_list->prog_list = new_prog_list;
+    Port_List_Tmp = new_port_list;
+    printk(KERN_DEBUG "Added new port and prog list elements for %u to front of Port_List_Tmp\n", (unsigned int) Port_List_Tmp->port);
+
+    OUT:
+        kfree(kbuffer);
+        return count;
 }
