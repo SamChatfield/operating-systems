@@ -8,24 +8,28 @@ int main(int argc, char *argv[])
 {
     // Rudimentary argument checks, print usage if incorrect
     if (argc < 2 || argc > 3) {
+        printf("ERROR: Invalid arguments\n");
         printf("Usage:\n  %s L\n  %s W <filename>\n", argv[0], argv[0]);
         return 1;
     }
 
     const char flag = argv[1][0];
-    printf("Flag: %c\n", flag);
-
-    switch (flag)
-    {
-    case 'L':
-        l_func();
-        break;
-    case 'W':
-        w_func();
-        break;
-    default:
-        printf("ERROR: Invalid command flag '%c'\n", flag);
-        return 1;
+    switch (flag) {
+        case 'L':
+            l_func();
+            break;
+        case 'W':
+            if (argc != 3) {
+                printf("ERROR: Invalid arguments\n");
+                printf("Usage:\n  %s L\n  %s W <filename>\n", argv[0], argv[0]);
+                return 1;
+            }
+            // const char *filename = argv[2];
+            w_func();
+            break;
+        default:
+            printf("ERROR: Invalid command flag '%c'\n", flag);
+            return 1;
     }
 
     return 0;
