@@ -20,7 +20,6 @@ MODULE_LICENSE("GPL");
 int init_module(void)
 {
     int errno;
-    fw_prog_list *pl;
 
     // Create /proc file
     Proc_File = proc_create_data(PROC_ENTRY_FILENAME, 0644, NULL, &Proc_File_Fops, NULL);
@@ -39,22 +38,13 @@ int init_module(void)
     printk(KERN_INFO "Firewall extension module loaded\n");
 
     // Initialise the Port_List
+    down_write(&rules_sem);
     Port_List = init_portlist();
-    if (!Port_List) return -ENOMEM;
-
-    // TODO: REMOVE
-    pl = (fw_prog_list *) kmalloc(sizeof(fw_prog_list), GFP_KERNEL);
-    if (!pl) {
-        kfree(Port_List);
+    if (!Port_List) {
+        up_write(&rules_sem);
         return -ENOMEM;
     }
-    pl->next = NULL;
-    pl->program = "/usr/bin/telnet.netkit";
-
-    Port_List->next = NULL;
-    Port_List->port = 80;
-    Port_List->prog_list = pl;
-    // TODO: END REMOVE
+    up_write(&rules_sem);
 
     // A non 0 return means init_module failed; module can't be loaded.
     return errno;
@@ -66,9 +56,11 @@ void cleanup_module(void)
     nf_unregister_hook(&firewallExtension_ops);
 
     // Free all memory associated with the Port_List
+    down_write(&rules_sem);
     cleanup_portlist(Port_List);
     if (Port_List_Tmp)
         cleanup_portlist(Port_List_Tmp);
+    up_write(&rules_sem);
 
     remove_proc_entry(PROC_ENTRY_FILENAME, NULL);
     printk(KERN_INFO "/proc/%s removed\n", PROC_ENTRY_FILENAME);
@@ -170,6 +162,8 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
         mmput(mm);
 
         dst_port = ntohs(tcp->dest);
+
+        down_read(&rules_sem);
         port_list = Port_List;
 
         while (port_list) {
@@ -188,6 +182,7 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
                 while (prog_list) {
                     if (strncmp(prog->name, prog_list->program, prog_len) == 0) {
                         // Program found in program list for current port, accept packet
+                        up_read(&rules_sem);
                         printk(KERN_INFO "Program '%s' found in list for port '%u', accepting\n", prog->name, (unsigned int) dst_port);
                         kfree(prog->buffer);
                         kfree(prog);
@@ -197,6 +192,7 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
                 }
 
                 // Program not found in program list, so drop packet
+                up_read(&rules_sem);
                 printk(KERN_INFO "Program '%s' not found in list for port '%u', dropping\n", prog->name, (unsigned int) dst_port);
                 kfree(prog->buffer);
                 kfree(prog);
@@ -206,8 +202,10 @@ unsigned int FirewallExtensionHook(void *priv, struct sk_buff *skb, const struct
             port_list = port_list->next;
         }
 
+        up_read(&rules_sem);
         return NF_ACCEPT;
     }
+
     return NF_ACCEPT;
 }
 
@@ -293,9 +291,10 @@ ssize_t procfs_read(struct file *file, char __user *buffer, size_t count, loff_t
     printk(KERN_DEBUG "procfs_read\n");
 
     // Trigger printk of firewall rules line-by-line
-    // Loop through all ports in Port_List
+    down_read(&rules_sem);
     port_list = Port_List;
 
+    // Loop through all ports in Port_List
     while (port_list) {
         // Loop through all programs for the current Port_List item
         prog_list = port_list->prog_list;
@@ -306,6 +305,7 @@ ssize_t procfs_read(struct file *file, char __user *buffer, size_t count, loff_t
         }
         port_list = port_list->next;
     }
+    up_read(&rules_sem);
     return 0;
 }
 
@@ -326,6 +326,7 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     if (count >= RULES_FLAG_LEN && strncmp(buffer, NEW_RULES_FLAG, RULES_FLAG_LEN) == 0) {
         printk(KERN_DEBUG "Buffer started with NEW flag\n");
 
+        down_write(&rules_sem);
         Port_List_Tmp = init_portlist();
         if (!Port_List_Tmp) {
             printk(KERN_DEBUG "init_portlist failed\n");
@@ -343,6 +344,7 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
         // Swap in the new port list from Port_List_Tmp to Port_List
         Port_List = Port_List_Tmp;
         Port_List_Tmp = NULL;
+        up_write(&rules_sem);
 
         return count;
     }
@@ -354,6 +356,7 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
         cleanup_portlist(Port_List_Tmp);
         Port_List_Tmp = NULL;
 
+        up_write(&rules_sem);
         return count;
     }
     printk(KERN_DEBUG "Buffer was not a flag\n");

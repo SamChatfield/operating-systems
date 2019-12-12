@@ -51,6 +51,7 @@ static struct nf_hook_ops firewallExtension_ops = {
 };
 
 DEFINE_MUTEX(proc_lock);
+DECLARE_RWSEM(rules_sem);
 static int Device_Open = 0;
 static fw_port_list *Port_List = NULL;
 static fw_port_list *Port_List_Tmp = NULL;
