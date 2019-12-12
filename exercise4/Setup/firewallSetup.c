@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 
 void l_func(void)
 {
-    printf("L\n");
+    printf("firewallSetup L\n");
 
     // Get file descriptor for the proc file in read-only mode
     int proc_fd = open(PROC_FILE_PATH, O_RDONLY);
@@ -64,7 +64,7 @@ void l_func(void)
 
 void w_func(const char *filename)
 {
-    printf("W\n");
+    printf("firewallSetup W\n");
     printf("Rules file: '%s'\n", filename);
 
     // Get file descriptor for the proc file in write-only mode
@@ -90,8 +90,6 @@ void w_func(const char *filename)
     int sscanf_res;
 
     while ((nread = getline(&lineptr, &n, file)) != -1) {
-        printf("Got line (%d): '%s'\n", nread, lineptr);
-
         // Validate the syntax of the line
         char program[nread];
         sscanf_res = sscanf(lineptr, "%u %s", &port, program);
@@ -113,8 +111,6 @@ void w_func(const char *filename)
             printf("ERROR: Writing to proc file failed\n");
             exit(1);
         }
-
-        printf("Wrote line to proc file\n");
 
         free(lineptr);
         lineptr = NULL;
