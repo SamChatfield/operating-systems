@@ -345,9 +345,18 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
         Port_List_Tmp = NULL;
 
         return count;
-    } else {
-        printk(KERN_DEBUG "Buffer was not a flag\n");
     }
+    // If buffer is KIL flag: abort the creation of Port_List_Tmp and free memory
+    else if (count >= RULES_FLAG_LEN && strncmp(buffer, KILL_RULES_FLAG, RULES_FLAG_LEN) == 0) {
+        printk(KERN_DEBUG "Buffer started with KIL flag\n");
+
+        // Cleanup Port_List_Tmp
+        cleanup_portlist(Port_List_Tmp);
+        Port_List_Tmp = NULL;
+
+        return count;
+    }
+    printk(KERN_DEBUG "Buffer was not a flag\n");
 
     // TODO: REMOVE
     printk(KERN_DEBUG "Buffer (%zu): '%.*s'\n", count, count, buffer);

@@ -13,6 +13,7 @@
 #define EXE_BUFSIZ 80
 #define NEW_RULES_FLAG "NEW"
 #define END_RULES_FLAG "END"
+#define KILL_RULES_FLAG "KIL"
 #define RULES_FLAG_LEN 3
 
 typedef struct fw_prog_list {
