@@ -106,8 +106,7 @@ void cleanup_portlist(fw_port_list *port_list_head)
             printk(KERN_DEBUG "Freeing prog node: '%s'\n", prog_list->program);
             tmp_prog_list = prog_list;
             prog_list = prog_list->next;
-            // TODO: Free tmp_prog_list->program when that becomes heap allocated
-            // kfree(tmp_prog_list->program);
+            kfree(tmp_prog_list->program);
             kfree(tmp_prog_list);
         }
 
@@ -361,13 +360,6 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     }
     printk(KERN_DEBUG "Buffer was not a flag\n");
 
-    // TODO: REMOVE
-    printk(KERN_DEBUG "Buffer (%zu): '%.*s'\n", count, count, buffer);
-    for (i = 0; i < count; i++) {
-        printk(KERN_DEBUG "Char (%d): '%c'\n", i, buffer[i]);
-	}
-    // TODO: END REMOVE
-
     // Create a kernel buffer with correct size
     kbuffer = (char *) kmalloc(sizeof(char) * count, GFP_KERNEL);
     if (!kbuffer) {
@@ -388,16 +380,6 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     }
     kbuffer[count-1] = '\0';
     prog_len = strlen(kbuffer);
-
-    // TODO: REMOVE
-    printk(KERN_DEBUG "KBuffer (%zu): '%.*s'\n", count, count, kbuffer);
-    for (i = 0; i < count; i++) {
-        if (kbuffer[i] == '\0')
-            printk(KERN_DEBUG "Char (%d): '\\0'\n", i);
-        else
-            printk(KERN_DEBUG "Char (%d): '%c'\n", i, kbuffer[i]);
-	}
-    // TODO: END REMOVE
 
     // Use strsep on kernel buffer to split into two tokens by the space
     buf_prog_p = kbuffer;
@@ -426,16 +408,6 @@ ssize_t procfs_write(struct file *file, const char __user *buffer, size_t count,
     for (i = 0; i < prog_len; i++) {
         program[i] = kbuffer[i+port_len+1];
     }
-
-    // TODO: REMOVE
-    printk(KERN_DEBUG "Program (%zu): '%.*s'\n", prog_len, prog_len, program);
-    for (i = 0; i < prog_len; i++) {
-        if (program[i] == '\0')
-            printk(KERN_DEBUG "Char (%d): '\\0'\n", i);
-        else
-            printk(KERN_DEBUG "Char (%d): '%c'\n", i, program[i]);
-	}
-    // TODO: END REMOVE
 
     // Walk through Port_List_Tmp and add the new rule
 
