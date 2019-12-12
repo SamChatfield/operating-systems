@@ -24,8 +24,8 @@ int main(int argc, char *argv[])
                 printf("Usage:\n  %s L\n  %s W <filename>\n", argv[0], argv[0]);
                 return 1;
             }
-            // const char *filename = argv[2];
-            w_func();
+            const char *filename = argv[2];
+            w_func(filename);
             break;
         default:
             printf("ERROR: Invalid command flag '%c'\n", flag);
@@ -38,8 +38,13 @@ int main(int argc, char *argv[])
 void l_func(void)
 {
     printf("L\n");
+
     // Get file descriptor for the proc file in read-only mode
     int proc_fd = open(PROC_FILE_PATH, O_RDONLY);
+    if (proc_fd < 0) {
+        printf("ERROR: Opening proc file failed\n");
+        exit(1);
+    }
 
     // Use a fake read (0 bytes) to trigger printing of firewall rules in /var/log/kern.log
     char *fake_buf = NULL;
@@ -57,7 +62,60 @@ void l_func(void)
     }
 }
 
-void w_func(void)
+void w_func(const char *filename)
 {
     printf("W\n");
+    printf("Rules file: '%s'\n", filename);
+
+    // Get file descriptor for the proc file in write-only mode
+    int proc_fd = open(PROC_FILE_PATH, O_WRONLY);
+    if (proc_fd < 0) {
+        printf("ERROR: Opening proc file failed\n");
+        exit(1);
+    }
+
+    // Write the NEW flag to the proc file
+    int write_res = write(proc_fd, "NEW\n", 4);
+    if (write_res < 0) {
+        printf("ERROR: Writing NEW to proc file failed\n");
+        exit(1);
+    }
+
+    FILE *file = fopen(filename, "r");
+
+    char *lineptr = NULL;
+    size_t n = 0;
+    ssize_t nread;
+
+    while ((nread = getline(&lineptr, &n, file)) != -1) {
+        printf("Got line (%d): '%s'\n", nread, lineptr);
+
+        write_res = write(proc_fd, lineptr, nread);
+        if (write_res < 0) {
+            printf("ERROR: Writing to proc file failed\n");
+            exit(1);
+        }
+
+        printf("Wrote line to proc file\n");
+
+        free(lineptr);
+        lineptr = NULL;
+        n = 0;
+    }
+    free(lineptr);
+    fclose(file);
+
+    // Write the END flag to the proc file
+    write_res = write(proc_fd, "END\n", 4);
+    if (write_res < 0) {
+        printf("ERROR: Writing END to proc file failed\n");
+        exit(1);
+    }
+
+    // Close the proc file descriptor
+    int close_res = close(proc_fd);
+    if (close_res) {
+        printf("ERROR: Closing proc file failed\n");
+        exit(1);
+    }
 }
