@@ -86,9 +86,27 @@ void w_func(const char *filename)
     char *lineptr = NULL;
     size_t n = 0;
     ssize_t nread;
+    unsigned int port;
+    int sscanf_res;
 
     while ((nread = getline(&lineptr, &n, file)) != -1) {
         printf("Got line (%d): '%s'\n", nread, lineptr);
+
+        // Validate the syntax of the line
+        char program[nread];
+        sscanf_res = sscanf(lineptr, "%u %s", &port, program);
+        // If the line is invalid, abort
+        if (sscanf_res < 2) {
+            printf("ERROR: Ill-formed file\n");
+            // Send the KIL flag to the proc file so it can abort creating the new rules
+            write_res = write(proc_fd, "KIL\n", 4);
+            if (write_res < 0) printf("ERROR: Writing KIL to proc file failed\n");
+            free(lineptr);
+            fclose(file);
+            int close_res = close(proc_fd);
+            if (close_res) printf("ERROR: Closing proc file failed\n");
+            exit(1);
+        }
 
         write_res = write(proc_fd, lineptr, nread);
         if (write_res < 0) {
